@@ -2,16 +2,16 @@
 
 module Main where
 
-import Lib
+import           Text.HTML.Justext
 
-import Data.Monoid ((<>))
-import Data.Maybe (fromMaybe)
-import qualified Data.ByteString as B (readFile, putStr)
-import Data.Text (Text)
-import qualified Data.Text as T (lines, unlines)
-import Data.Text.Encoding (encodeUtf8, decodeUtf8)
-import System.Environment (getArgs)
-import System.Exit (die)
+import qualified Data.ByteString    as B (putStr, readFile)
+import           Data.Maybe         (fromMaybe)
+import           Data.Monoid        ((<>))
+import           Data.Text          (Text)
+import qualified Data.Text          as T (lines, unlines)
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import           System.Environment (getArgs)
+import           System.Exit        (die)
 
 
 readUtf8File :: FilePath -> IO Text
@@ -27,7 +27,7 @@ main = do
       goodParas = filter ((== Good) . classType) paras
       mainText = T.unlines (printPara <$> goodParas)
   B.putStr $ encodeUtf8 mainText
-  
+
   where
     getArgs' :: IO (FilePath, FilePath)
     getArgs' = do
@@ -35,7 +35,7 @@ main = do
       if length args /= 2
          then die "Usage: justext <htmlFile> <stopwordsFile>"
          else return (args !! 0, args !! 1)
-    
+
     printPara :: Paragraph -> Text
     printPara para =
       let tagType = fromMaybe "p" (getHeadingTag (path para))
@@ -43,4 +43,4 @@ main = do
            <> text para
            <> "</" <> tagType <> ">"
 
-    
+

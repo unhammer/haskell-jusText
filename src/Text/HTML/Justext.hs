@@ -1,21 +1,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Lib ( Params(..)
-           , Paragraph(..)
-           , ParaClass(..)
-           , justext
-           , defaultParams
-           , getHeadingTag
-           , isBoilerPlate
-           ) where
+module Text.HTML.Justext
+  ( Params(..)
+  , Paragraph(..)
+  , ParaClass(..)
+  , justext
+  , defaultParams
+  , getHeadingTag
+  , isBoilerPlate
+  )
+where
 
-import Data.List (find, foldl', dropWhileEnd)
-import Data.Maybe (isJust, isNothing, fromJust)
-import Data.Monoid ((<>))
-import Data.Text (Text)
-import qualified Data.Text as T (length, null, findIndex, lines, strip, split, count)
-import qualified Data.Text.ICU as R (Match, find, findAll, span, group, regex, prefix, suffix)
-import Text.HTML.Parser (Token(..), parseTokens)
+import           Data.List        (dropWhileEnd, find, foldl')
+import           Data.Maybe       (fromJust, isJust, isNothing)
+import           Data.Monoid      ((<>))
+import           Data.Text        (Text)
+import qualified Data.Text        as T (count, findIndex, length, lines, null,
+                                        split, strip)
+import qualified Data.Text.ICU    as R (Match, find, findAll, group, prefix,
+                                        regex, span, suffix)
+import           Text.HTML.Parser (Token (..), parseTokens)
 
 data ParaClass
   = Good
@@ -26,25 +30,25 @@ data ParaClass
 
 instance Show ParaClass where
   show c = case c of
-             Good -> "good"
+             Good     -> "good"
              NearGood -> "nearGood"
-             Bad -> "bad"
-             Short -> "short"
+             Bad      -> "bad"
+             Short    -> "short"
 
-data Paragraph = Paragraph { text :: Text
-                           , linkDensity :: Float
+data Paragraph = Paragraph { text             :: Text
+                           , linkDensity      :: Float
                            , charCountInLinks :: Int
-                           , classType :: ParaClass
-                           , path :: [Text]
-                           , textLength :: Int
+                           , classType        :: ParaClass
+                           , path             :: [Text]
+                           , textLength       :: Int
                            }
                  deriving (Show)
 
-data Params = Params { maxLinkDensity :: Float
-                     , lengthLow :: Int
-                     , lengthHigh :: Int
-                     , stopWordsLow :: Float
-                     , stopWordsHigh :: Float
+data Params = Params { maxLinkDensity     :: Float
+                     , lengthLow          :: Int
+                     , lengthHigh         :: Int
+                     , stopWordsLow       :: Float
+                     , stopWordsHigh      :: Float
                      , maxHeadingDistance :: Int }
 
 defaultParams :: Params
@@ -75,14 +79,14 @@ data Tag = Tag [Text] Token deriving (Show)
 tagName :: Tag -> Text
 tagName (Tag _ tok) =
   case tok of
-    TagOpen name _ -> name
+    TagOpen name _      -> name
     TagSelfClose name _ -> name
-    TagClose name -> name
-    _ -> ""
+    TagClose name       -> name
+    _                   -> ""
 
 getText :: Tag -> Text
 getText (Tag _ (ContentText text)) = text
-getText _ = ""
+getText _                          = ""
 
 getPath :: Tag -> [Text]
 getPath (Tag path _) = path
@@ -103,10 +107,10 @@ normalizeWhitespace txt =
        m : rest -> fromJust (R.prefix 0 m) <> sep m <> join rest
   where
     join :: [R.Match] -> Text
-    join [] = ""
-    join [m] = R.span m <> sep m <> fromJust (R.suffix 0 m)
+    join []         = ""
+    join [m]        = R.span m <> sep m <> fromJust (R.suffix 0 m)
     join (m : rest) = R.span m <> sep m <> join rest
-        
+
     sep :: R.Match -> Text
     sep match =
       let m = fromJust (R.group 0 match)
@@ -130,7 +134,7 @@ groupTags tags =
              then nextGroup isPrevBreak (acc ++ [tag]) rest
              else nextGroup False (acc ++ [tag]) rest
       | otherwise = nextGroup False (acc ++ [tag]) rest
-      
+
     isParaSeparator :: Tag -> Bool
     isParaSeparator = (`elem` paragraphTags) . tagName
 
@@ -148,7 +152,7 @@ buildParas tags = map mkPara (groupTags tags)
           linkCharCount = foldl' addCharCount 0 tagsInsideLink
           linkDensity = density linkCharCount (T.length text)
       in Paragraph text linkDensity linkCharCount Bad path (T.length text)
-          
+
     appendText :: Text -> Tag -> Text
     appendText text = (text <>) . getText
 
@@ -184,15 +188,15 @@ classifyPara params stopWords para
     containsCopyrightGlyph :: Text -> Bool
     containsCopyrightGlyph text =
       contains '\xa9' text || T.count "&copy;" text > 0
-    
+
     maxLinkDensity' = maxLinkDensity params
     lengthLow' = lengthLow params
     lengthHigh' = lengthHigh params
     stopWordsLow' = stopWordsLow params
     stopWordsHigh' = stopWordsHigh params
-    
+
     goodPara = para { classType = Good }
-    nearGoodPara = para { classType = NearGood }    
+    nearGoodPara = para { classType = NearGood }
     badPara = para { classType = Bad }
     shortPara = para { classType = Short }
 
@@ -207,7 +211,7 @@ prevBaseNeighborType :: Int -> [Paragraph] -> ParaClass
 prevBaseNeighborType i =
   maybe Bad classType .
      find ((`elem` [Good, Bad]) . classType) . prevNeighbors i
-  
+
 nextBaseNeighborType :: Int -> [Paragraph] -> ParaClass
 nextBaseNeighborType i =
   maybe Bad classType .
@@ -229,7 +233,7 @@ nextNeighbors i = drop (i + 1)
 
 index :: Int -> [a] -> Maybe a
 index i xs | i < length xs = Just (xs !! i)
-index _ _ = Nothing
+index _ _  = Nothing
 
 enumerate :: [a] -> [(Int, a)]
 enumerate xs = zip [0 .. length xs] xs
@@ -300,7 +304,7 @@ reviseShort paras = map reviseShort' (enumerate paras)
       if classType para == Short
         then revise i para
         else para
-    
+
     revise :: Int -> Paragraph -> Paragraph
     revise i p =
       let prevBase = prevBaseNeighborType i paras
@@ -309,10 +313,10 @@ reviseShort paras = map reviseShort' (enumerate paras)
           next = nextNeighborType i paras
       in case (prevBase, nextBase) of
         (Good, Good) -> p { classType = Good }
-        (Bad, Bad) -> p { classType = Bad }
-        (Bad, Good) | prev == NearGood -> p { classType = Good }
-        (Good, Bad) | next == NearGood -> p { classType = Good }
-        _ -> p { classType = Bad }
+        (Bad, Bad)   -> p { classType = Bad }
+        (Bad, Good)  | prev == NearGood -> p { classType = Good }
+        (Good, Bad)  | next == NearGood -> p { classType = Good }
+        _            -> p { classType = Bad }
 
 reviseNearGood :: [Paragraph] -> [Paragraph]
 reviseNearGood paras = map reviseNearGood' (enumerate paras)
@@ -329,7 +333,7 @@ reviseNearGood paras = map reviseNearGood' (enumerate paras)
           nextBase = nextBaseNeighborType i paras
       in case (prevBase, nextBase) of
            (Bad, Bad) -> p { classType = Bad }
-           _ -> p { classType = Good }
+           _          -> p { classType = Good }
 
 
 reviseClassification :: Params -> [Paragraph] -> [Paragraph]
@@ -345,14 +349,14 @@ preProcess = filter (not . exclude)
     exclude :: Tag -> Bool
     exclude tag@(Tag _ tok) =
       pathContains stripTags tag || isComment tok || isDoctype tok
-      
+
     isComment :: Token -> Bool
     isComment (Comment _) = True
-    isComment _ = False
+    isComment _           = False
 
     isDoctype :: Token -> Bool
     isDoctype (Doctype _) = True
-    isDoctype _ = False
+    isDoctype _           = False
 
 createTags :: [Token] -> [Tag]
 createTags = snd . foldl' build ([], [])
@@ -362,16 +366,16 @@ createTags = snd . foldl' build ([], [])
       let tags' = tags ++ [Tag path tok] in
       case tok of
         TagOpen t _ | not (isNoClose t) -> (path ++ [t], tags')
-        TagClose t -> (popTill t path, tags')
-        _ -> (path, tags')
-    
+        TagClose t  -> (popTill t path, tags')
+        _           -> (path, tags')
+
     isNoClose :: Text -> Bool
     isNoClose = (`elem` noCloseTags)
 
     popTill :: Text -> [Text] -> [Text]
     popTill tagName path =
       case dropWhileEnd (tagName /=) path of
-        [] -> []
+        []    -> []
         path' -> init path'
 
 parseHtml :: Text -> [Tag]
@@ -387,4 +391,3 @@ justext html params stopWords =
   where
     discardEmpty :: [Paragraph] -> [Paragraph]
     discardEmpty = filter (isNothing . R.find (R.regex [] "^[\n ]*$") . text)
-  
